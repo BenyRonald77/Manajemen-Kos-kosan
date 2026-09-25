@@ -1,0 +1,97 @@
+// Prisma schema — Manajemen Kos-kosan
+// Default provider: SQLite (mudah dijalankan lokal). Untuk production ganti
+// provider ke "postgresql" dan sesuaikan DATABASE_URL (lihat README.md).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Owner {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+
+  properties Property[]
+}
+
+model Property {
+  id        String   @id @default(cuid())
+  ownerId   String
+  name      String
+  address   String
+  createdAt DateTime @default(now())
+
+  owner Owner  @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  rooms Room[]
+}
+
+// status: "VACANT" | "OCCUPIED" — lihat src/lib/constants.ts
+model Room {
+  id          String   @id @default(cuid())
+  propertyId  String
+  number      String
+  monthlyRent Int
+  status      String   @default("VACANT")
+  createdAt   DateTime @default(now())
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  tenants  Tenant[]
+
+  @@unique([propertyId, number])
+}
+
+// status: "ACTIVE" | "INACTIVE" — lihat src/lib/constants.ts
+model Tenant {
+  id           String    @id @default(cuid())
+  roomId       String?
+  name         String
+  email        String    @unique
+  passwordHash String
+  phone        String
+  status       String    @default("ACTIVE")
+  startDate    DateTime  @default(now())
+  endDate      DateTime?
+  createdAt    DateTime  @default(now())
+
+  room     Room?     @relation(fields: [roomId], references: [id])
+  invoices Invoice[]
+}
+
+// status: "UNPAID" | "PAID" | "EXPIRED" — lihat src/lib/constants.ts
+model Invoice {
+  id        String    @id @default(cuid())
+  tenantId  String
+  period    String // format YYYY-MM
+  amount    Int
+  dueDate   DateTime
+  status    String    @default("UNPAID")
+  paidAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  payments Payment[]
+
+  @@unique([tenantId, period])
+}
+
+// status: "PENDING" | "SETTLEMENT" | "EXPIRE" | "CANCEL" | "DENY"
+model Payment {
+  id               String   @id @default(cuid())
+  invoiceId        String
+  orderId          String   @unique
+  amount           Int
+  status           String   @default("PENDING")
+  snapToken        String?
+  rawNotification  String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+}
