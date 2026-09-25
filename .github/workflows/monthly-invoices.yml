@@ -1,0 +1,21 @@
+name: Generate Monthly Invoices
+
+# Contoh scheduler eksternal untuk memicu tagihan bulanan otomatis tanpa perlu
+# proses server yang selalu menyala. Dijalankan setiap hari pukul 00:05 WIB
+# (17:05 UTC) — aman karena endpoint-nya idempotent (hanya membuat tagihan
+# saat periode bulan berjalan belum punya tagihan). Sesuaikan APP_URL &
+# CRON_SECRET di repo Settings > Secrets and variables > Actions sebelum
+# mengaktifkan workflow ini.
+on:
+  schedule:
+    - cron: "5 17 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  trigger-invoice-generation:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Panggil endpoint cron generate-invoices
+        run: |
+          curl -sf -X POST "${{ secrets.APP_URL }}/api/cron/generate-invoices" \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}"
