@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
-import { RoomStatus, TenantStatus } from "@/lib/constants";
+import { InvoiceStatus, RoomStatus, TenantStatus } from "@/lib/constants";
 
 export class KosError extends Error {}
 
@@ -123,6 +123,29 @@ export async function checkoutTenant(ownerId: string, tenantId: string) {
       await tx.room.update({ where: { id: tenant.roomId }, data: { status: RoomStatus.VACANT } });
     }
     return updated;
+  });
+}
+
+export async function getOwnerInvoices(ownerId: string) {
+  return prisma.invoice.findMany({
+    where: { tenant: { room: { property: { ownerId } } } },
+    orderBy: [{ period: "desc" }, { createdAt: "desc" }],
+    include: { tenant: { include: { room: true } } },
+  });
+}
+
+export async function markInvoicePaid(ownerId: string, invoiceId: string) {
+  const invoice = await prisma.invoice.findFirst({
+    where: { id: invoiceId, tenant: { room: { property: { ownerId } } } },
+  });
+  if (!invoice) throw new KosError("Tagihan tidak ditemukan");
+  if (invoice.status === InvoiceStatus.PAID) {
+    throw new KosError("Tagihan ini sudah lunas");
+  }
+
+  return prisma.invoice.update({
+    where: { id: invoiceId },
+    data: { status: InvoiceStatus.PAID, paidAt: new Date() },
   });
 }
 
